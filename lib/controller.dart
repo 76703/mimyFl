@@ -274,9 +274,7 @@ class AppController {
   }
 
   Future<Result<bool>> _requestAdmin(bool enableTun) async {
-    if (system.isWindows && kDebugMode) {
-      return Result.success(false);
-    }
+    // Android 端不需要管理员权限检查
     final realTunEnable = _ref.read(realTunEnableProvider);
     if (enableTun != realTunEnable && realTunEnable == false) {
       final code = await system.authorizeCore();
@@ -435,9 +433,7 @@ class AppController {
       return;
     }
     if (_ref.read(appSettingProvider).minimizeOnExit) {
-      if (system.isDesktop) {
-        await savePreferences();
-      }
+      await savePreferences();
       await system.back();
     } else {
       await handleExit();

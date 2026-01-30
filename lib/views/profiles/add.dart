@@ -21,10 +21,6 @@ class AddProfileView extends StatelessWidget {
   }
 
   Future<void> _toScan() async {
-    if (system.isDesktop) {
-      globalState.appController.addProfileFormQrCode();
-      return;
-    }
     final url = await BaseNavigator.push(
       context,
       const ScanPage(),

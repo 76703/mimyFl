@@ -468,37 +468,22 @@ class SuperGridState extends State<SuperGrid> with TickerProviderStateMixin {
         child: target,
       ),
     );
-    final draggableChild = system.isDesktop
-        ? Draggable(
-            childWhenDragging: childWhenDragging,
-            data: index,
-            feedback: feedback,
-            onDragStarted: () {
-              _handleDragStarted(index);
-            },
-            onDragUpdate: (details) {
-              _handleDragUpdate(details);
-            },
-            onDragEnd: (details) {
-              _handleDragEnd(details);
-            },
-            child: shakeTarget,
-          )
-        : LongPressDraggable(
-            childWhenDragging: childWhenDragging,
-            data: index,
-            feedback: feedback,
-            onDragStarted: () {
-              _handleDragStarted(index);
-            },
-            onDragUpdate: (details) {
-              _handleDragUpdate(details);
-            },
-            onDragEnd: (details) {
-              _handleDragEnd(details);
-            },
-            child: shakeTarget,
-          );
+    // Android 端使用长按拖拽
+    final draggableChild = LongPressDraggable(
+        childWhenDragging: childWhenDragging,
+        data: index,
+        feedback: feedback,
+        onDragStarted: () {
+          _handleDragStarted(index);
+        },
+        onDragUpdate: (details) {
+          _handleDragUpdate(details);
+        },
+        onDragEnd: (details) {
+          _handleDragEnd(details);
+        },
+        child: shakeTarget,
+      );
     return draggableChild;
   }
 

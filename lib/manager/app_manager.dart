@@ -152,16 +152,6 @@ class AppSidebarContainer extends ConsumerWidget {
     required Widget child,
   }) {
     return Material(color: context.colorScheme.surfaceContainer, child: child);
-    // if (!system.isMacOS) {
-    //   return Material(
-    //     color: context.colorScheme.surfaceContainer,
-    //     child: child,
-    //   );
-    // }
-    // return child;
-    // return TransparentMacOSSidebar(
-    //   child: Material(color: Colors.transparent, child: child),
-    // );
   }
 
   void _updateSideBarWidth(WidgetRef ref, double contentWidth) {
@@ -193,12 +183,9 @@ class AppSidebarContainer extends ConsumerWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    if (system.isMacOS) SizedBox(height: 22),
                     SizedBox(height: 10),
-                    if (!system.isMacOS) ...[
-                      ClipRect(child: AppIcon()),
-                      SizedBox(height: 12),
-                    ],
+                    ClipRect(child: AppIcon()),
+                    SizedBox(height: 12),
                     Expanded(
                       child: ScrollConfiguration(
                         behavior: HiddenBarScrollBehavior(),

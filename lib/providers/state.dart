@@ -402,16 +402,13 @@ PackageListSelectorState packageListSelectorState(Ref ref) {
 @riverpod
 MoreToolsSelectorState moreToolsSelectorState(Ref ref) {
   final viewMode = ref.watch(viewModeProvider);
+  // 在移动端模式下筛选 "more" 模式的导航项
   final navigationItems = ref.watch(
     navigationItemsStateProvider.select((state) {
       return state.value.where((element) {
         final isMore = element.modes.contains(NavigationItemMode.more);
-        final isDesktop = element.modes.contains(NavigationItemMode.desktop);
-        if (isMore && !isDesktop) return true;
-        if (viewMode != ViewMode.mobile || !isMore) {
-          return false;
-        }
-        return true;
+        // 只在移动端显示 "more" 项
+        return isMore && viewMode == ViewMode.mobile;
       }).toList();
     }),
   );
@@ -677,14 +674,8 @@ AndroidState androidState(Ref ref) {
 
 @riverpod
 double overlayTopOffset(Ref ref) {
-  final isMobileView = ref.watch(isMobileViewProvider);
-  final version = ref.watch(versionProvider);
-  ref.watch(viewSizeProvider);
-  double top = kHeaderHeight;
-  if ((version <= 10 || !isMobileView) && system.isMacOS || !system.isDesktop) {
-    top = 0;
-  }
-  return kToolbarHeight + top;
+  // Android 端不需要顶部偏移
+  return kToolbarHeight;
 }
 
 @riverpod

@@ -449,7 +449,7 @@ class ExternalControllerItem extends ConsumerWidget {
 final generalItems = <Widget>[
   LogLevelItem(),
   UaItem(),
-  if (system.isDesktop) KeepAliveIntervalItem(),
+  KeepAliveIntervalItem(),
   TestUrlItem(),
   PortItem(),
   HostsItem(),
