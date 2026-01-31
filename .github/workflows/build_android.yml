@@ -54,8 +54,13 @@ jobs:
       # 7. 配置 NDK 环境变量
       - name: Configure NDK environment
         run: |
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25b" >> $GITHUB_ENV
-          echo "ANDROID_NDK=$ANDROID_HOME/ndk/25b" >> $GITHUB_ENV
+          # 查找实际的 NDK 路径
+          NDK_PATH=$(find $ANDROID_HOME -type d -name "25b" | head -n 1)
+          echo "Found NDK at: $NDK_PATH"
+          echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+          echo "ANDROID_NDK=$NDK_PATH" >> $GITHUB_ENV
+          # 验证路径
+          ls -la "$NDK_PATH/toolchains/llvm/prebuilt/"
 
       # 8. 获取项目依赖
       - name: Get Flutter dependencies
