@@ -35,7 +35,6 @@ export 'scroll.dart';
 export 'string.dart';
 export 'system.dart';
 export 'text.dart';
-export 'tray.dart';
 export 'utils.dart';
-export 'window.dart';
+// tray.dart 和 window.dart 是桌面端专用，Android 端不需要
 export 'yaml.dart';

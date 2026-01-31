@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
-import 'package:fl_clash/manager/window_manager.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter/foundation.dart';
@@ -47,19 +46,7 @@ class _AppStateManagerState extends ConsumerState<AppStateManager>
         globalState.appController.updateGroupsDebounce();
       }
     });
-    if (window == null) {
-      return;
-    }
-    ref.listenManual(autoSetSystemDnsStateProvider, (prev, next) async {
-      if (prev == next) {
-        return;
-      }
-      if (next.a == true && next.b == true) {
-        macOS?.updateDns(false);
-      } else {
-        macOS?.updateDns(true);
-      }
-    });
+    // Android 端不需要系统 DNS 设置
   }
 
   @override
