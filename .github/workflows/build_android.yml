@@ -40,12 +40,13 @@ jobs:
           flutter-version: '3.29.0'
           channel: 'stable'
 
-      # 5. 安装 Android NDK（用于编译 Go 核心）
-      - name: Setup Android NDK
-        uses: nttllnht/setup-android-ndk@v1
+      # 5. 安装 Android SDK（包含 NDK）
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
         with:
-          ndk-version: r25b
-          api-level: 21
+          api-level: 34
+          ndk-version: 25b
+          build-tools: 34.0.0
 
       # 6. 获取 Flutter 依赖
       - name: Get Flutter dependencies
