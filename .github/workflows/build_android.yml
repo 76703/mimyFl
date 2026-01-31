@@ -81,7 +81,8 @@ jobs:
 
       # 10. 构建 Release APK
       - name: Build Release APK
-        run: flutter build apk --release
+        run: |
+          flutter build apk --release --verbose --stack-trace
 
       # 11. 上传 APK 文件
       - name: Upload APK
