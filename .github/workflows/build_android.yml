@@ -19,13 +19,6 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
-      # 1.1 配置 Git submodule 使用 HTTPS（解决 SSH 密钥问题）
-      - name: Configure Git submodules to use HTTPS
-        run: |
-          git config --global url."https://github.com/".insteadOf "git@github.com:"
-          git submodule sync
-          git submodule update --init --recursive
-
       # 2. 安装 Java JDK 17
       - name: Set up Java JDK 17
         uses: actions/setup-java@v4
@@ -33,21 +26,25 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # 3. 安装 Go 环境
+      # 3. 安装 Flutter
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          channel: 'stable'
+
+      # 4. 安装 Go 语言
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
           cache: false
 
-      # 4. 安装 Flutter
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.38.9'
-          channel: 'stable'
+      # 5. 安装 Ninja 编译工具
+      - name: Install Ninja build tool
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
 
-      # 5. 安装 Android SDK（包含 NDK）
+      # 6. 安装 Android SDK（包含 NDK）
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -55,66 +52,23 @@ jobs:
           ndk-version: 25b
           build-tools: 34.0.0
 
-      # 5.1 查找 NDK 实际路径并设置环境变量
-      - name: Find and set NDK path
-        id: ndk
+      # 7. 配置 NDK 环境变量
+      - name: Configure NDK environment
         run: |
-          echo "Searching for NDK installation..."
-          # 查找 NDK 目录
-          NDK_PATH=$(find $ANDROID_HOME -type d -name "25b" 2>/dev/null | head -n 1)
-          echo "Found NDK at: $NDK_PATH"
-          if [ -z "$NDK_PATH" ]; then
-            echo "NDK not found, installing manually..."
-            # 手动下载并解压 NDK
-            wget -q https://dl.google.com/android/repository/android-ndk-r25b-linux.zip -O /tmp/ndk.zip
-            unzip -q /tmp/ndk.zip -d /tmp/
-            NDK_PATH="/tmp/android-ndk-r25b"
-          fi
-          echo "NDK_PATH=$NDK_PATH" >> $GITHUB_OUTPUT
-          echo "Final NDK path: $NDK_PATH"
-          ls -la "$NDK_PATH/toolchains/llvm/prebuilt/" || echo "Prebuilt dir not found"
-          
-      # 5.2 设置 NDK 环境变量
-      - name: Set NDK environment variables
-        run: |
-          echo "ANDROID_NDK_HOME=${{ steps.ndk.outputs.NDK_PATH }}" >> $GITHUB_ENV
-          echo "ANDROID_NDK=${{ steps.ndk.outputs.NDK_PATH }}" >> $GITHUB_ENV
-          echo "ANDROID_NDK_ROOT=${{ steps.ndk.outputs.NDK_PATH }}" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25b" >> $GITHUB_ENV
+          echo "ANDROID_NDK=$ANDROID_HOME/ndk/25b" >> $GITHUB_ENV
 
-      # 7. 安装 flutter_distributor 依赖
-      - name: Install flutter_distributor dependencies
-        run: |
-          echo "Installing flutter_distributor dependencies..."
-          cd plugins/flutter_distributor/packages/flutter_distributor
-          flutter pub get --verbose
-          dart pub global activate -s path . --verbose
-          echo "flutter_distributor installed successfully"
+      # 8. 获取项目依赖
+      - name: Get Flutter dependencies
+        run: dart pub get
 
-      # 8. 清理并获取主项目依赖
-      - name: Clean and get main project dependencies
-        run: |
-          flutter clean
-          flutter pub get
+      # 9. 初始化并编译 Android 核心
+      - name: Build Android Core
+        run: dart ./setup.dart android
 
-      # 9. 获取 Go 依赖并编译 Android 核心
-      - name: Build Android Core (Go + CGO)
-        run: |
-          echo "Starting Android core build..."
-          dart ./setup.dart android --out app
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_PATH }}
-
-      # 10. 构建 Release APK（使用 flutter_distributor 或备选方案）
+      # 10. 构建 Release APK
       - name: Build Release APK
-        id: build
-        run: |
-          echo "Attempting build with flutter_distributor..."
-          cd plugins/flutter_distributor/packages/flutter_distributor
-          flutter_distributor package --skip-clean --platform android --targets apk --flutter-build-args="verbose,split-per-abi" --build-target-platform="android-arm,android-arm64,android-x64" --build-dart-define=APP_ENV=pre || {
-            echo "flutter_distributor failed, trying standard flutter build..."
-            cd $GITHUB_WORKSPACE
-            flutter build apk --release --verbose
-          }
+        run: flutter build apk --release
 
       # 11. 上传 APK 文件
       - name: Upload APK
