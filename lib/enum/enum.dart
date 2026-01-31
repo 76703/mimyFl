@@ -9,7 +9,8 @@ import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hotkey_manager/hotkey_manager.dart';
+
+// hotkey_manager 是桌面端依赖，Android 端不需要
 
 enum SupportPlatform {
   Windows,
