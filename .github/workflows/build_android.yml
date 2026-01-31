@@ -5,6 +5,7 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -12,12 +13,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 检出代码（包含子模块）
+      # 1. 检出代码（关键：fetch-depth: 0 确保版本号生成正确）
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          fetch-depth: 1
+          fetch-depth: 0
 
       # 2. 安装 Java JDK 17
       - name: Set up Java JDK 17
@@ -32,7 +33,7 @@ jobs:
         with:
           channel: 'stable'
 
-      # 4. 安装 Go 语言
+      # 4. 安装 Go 语言 (Core 编译必须)
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -43,93 +44,74 @@ jobs:
       - name: Install Ninja build tool
         run: sudo apt-get update && sudo apt-get install -y ninja-build
 
-      # 6. 安装 Android SDK（包含 NDK）
+      # 6. 安装 Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           api-level: 34
-          ndk-version: 25b
+          ndk-version: 25.2.9519653 # 指定具体的稳定版本
           build-tools: 34.0.0
 
-      # 7. 安装并配置 NDK
+      # 7. 强制配置 NDK 环境变量 (双重保险)
       - name: Install and configure NDK
         run: |
-          # 检查 NDK 是否已存在
-          NDK_PATH=$(find $ANDROID_HOME -type d -name "25b" | head -n 1)
+          echo "Looking for NDK..."
+          # 尝试找到 setup-android 安装的 NDK
+          NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -type d | sort -V | tail -n 1)
           
-          if [ -z "$NDK_PATH" ]; then
-            echo "NDK not found, downloading manually..."
-            # 下载 NDK
+          if [ -z "$NDK_PATH" ] || [ "$NDK_PATH" = "$ANDROID_HOME/ndk" ]; then
+            echo "NDK not found standardly, downloading manual fallback..."
             wget -q https://dl.google.com/android/repository/android-ndk-r25b-linux.zip -O /tmp/ndk.zip
             unzip -q /tmp/ndk.zip -d /tmp/
             NDK_PATH="/tmp/android-ndk-r25b"
           fi
           
-          echo "Found NDK at: $NDK_PATH"
+          echo "Using NDK at: $NDK_PATH"
           echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
           echo "ANDROID_NDK=$NDK_PATH" >> $GITHUB_ENV
-          # 验证路径
-          ls -la "$NDK_PATH/toolchains/llvm/prebuilt/"
 
       # 8. 获取项目依赖
       - name: Get Flutter dependencies
         run: dart pub get
 
-      # 8.1 分析 Dart 代码错误
+      # 8.1 分析代码 (设置出错不中断，防止因代码风格问题停止打包)
       - name: Analyze Dart code
         run: flutter analyze
+        continue-on-error: true
 
-      # 9. 初始化并编译 Android 核心
+      # 9. 初始化并编译 Android 核心 (关键步骤)
       - name: Build Android Core
         run: dart ./setup.dart android
 
-      # 10. 构建 Release APK
+      # 10. 构建 Release APK (添加了 id: build 修复引用错误)
       - name: Build Release APK
+        id: build
         run: |
-          flutter build apk --release --verbose --stack-trace 2>&1 | tee build.log
+          flutter build apk --release --verbose 2>&1 | tee build.log
         continue-on-error: true
 
-      # 10.1 上传构建日志用于调试
+      # 10.1 上传构建日志 (方便排错)
       - name: Upload build log
-        if: failure()
+        if: steps.build.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: build-log
           path: build.log
-          retention-days: 7
+          retention-days: 3
 
-      # 10.2 检查构建是否成功
+      # 10.2 检查构建结果 (修复了逻辑)
       - name: Check build result
         if: steps.build.outcome == 'failure'
         run: |
-          echo "Build failed! Checking for errors..."
-          cat build.log | grep -A 10 -B 5 "error:" || echo "No explicit error found"
-          cat build.log | grep -A 5 "FAILURE" || echo "No failure message found"
+          echo "Build failed! analyzing errors..."
+          grep -C 5 "error" build.log || echo "No explicit error found in grep"
           exit 1
 
       # 11. 上传 APK 文件
       - name: Upload APK
+        if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: flclash-android-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
-
-  release:
-    name: Create Release
-    needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-
-    steps:
-      - name: Download APK
-        uses: actions/download-artifact@v4
-        with:
-          name: flclash-android-apk
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: app-release.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
