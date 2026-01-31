@@ -1,4 +1,4 @@
-name: Build Android APK (Final Fix)
+name: Build Android APK (HTTPS Fix)
 
 on:
   push:
@@ -19,15 +19,18 @@ jobs:
           fetch-depth: 0
 
       # 2. 【核心修复步骤】强制修复缺失的插件和核心
-      # 这次加上了 --recursive，确保拉下来的 core 不是空壳！
-      - name: Fix Missing Plugins & Core (Deep Repair)
+      # 新增功能：强制把 SSH 链接转换为 HTTPS，解决 Permission denied 报错
+      - name: Fix Missing Plugins & Core (Force HTTPS)
         run: |
+          echo "🔧 Configuring Git to use HTTPS instead of SSH..."
+          # 这一行是解决报错的关键：强制将 git@github.com 替换为 https://github.com
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          
           echo "🔍 Checking integrity..."
           
-          # 定义一个函数来克隆官方资源
           repair_from_official() {
-            echo "🚑 Detected missing files. Cloning official repository (recursively)..."
-            # 注意：这里加了 --recursive，这是解决上次报错的关键
+            echo "🚑 Detected missing files. Cloning official repository..."
+            # 现在 --recursive 可以正常工作了，因为链接被自动替换成了 HTTPS
             git clone --recursive --depth 1 https://github.com/chen08209/FlClash.git temp_official_repo
             
             echo "📦 Restoring 'plugins' folder..."
@@ -51,14 +54,12 @@ jobs:
             echo "✅ Files seem intact."
           fi
           
-          # 验证一下 core 里面到底有没有东西 (Debug)
+          # 验证结果
           echo "📂 Verifying core structure:"
           ls -F core/
           if [ -d "core/Clash.Meta" ]; then
              echo "✅ core/Clash.Meta exists."
              ls -F core/Clash.Meta/go.mod || echo "❌ go.mod missing!"
-          else
-             echo "❌ core/Clash.Meta is still missing!"
           fi
 
       # 3. 安装 Java JDK 17
