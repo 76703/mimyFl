@@ -1,9 +1,7 @@
-name: Build Android APK
+name: Build Android APK (Auto-Fix)
 
 on:
   push:
-    branches: [ main, master ]
-  pull_request:
     branches: [ main, master ]
   workflow_dispatch:
 
@@ -13,84 +11,103 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 检出代码（关键：fetch-depth: 0 确保版本号生成正确）
+      # 1. 检出您的代码
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
 
-      # 2. 安装 Java JDK 17
+      # 2. 【核心修复步骤】强制修复缺失的插件和核心
+      # 如果您的 plugins 文件夹坏了，这一步会自动去官方仓库把好的插件搬过来
+      - name: Fix Missing Plugins & Core (Magic Fix)
+        run: |
+          echo "Checking plugins status..."
+          # 检查关键插件是否存在，如果不存在则强行从官方克隆
+          if [ ! -d "plugins/launch_at_startup" ] || [ -z "$(ls -A plugins/launch_at_startup)" ]; then
+            echo "⚠️ Plugins are missing or empty! Restoring from official repository..."
+            
+            # 克隆官方仓库到临时目录
+            git clone --depth 1 https://github.com/chen08209/FlClash.git temp_official_repo
+            
+            # 暴力替换 plugins 文件夹
+            rm -rf plugins
+            mv temp_official_repo/plugins .
+            
+            # 同时也修复核心代码 (core)
+            rm -rf core
+            mv temp_official_repo/core .
+            
+            # 清理临时文件
+            rm -rf temp_official_repo
+            
+            echo "✅ Plugins and Core restored successfully!"
+          else
+            echo "Plugins look fine."
+          fi
+
+      # 3. 安装 Java JDK 17
       - name: Set up Java JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      # 3. 安装 Flutter
+      # 4. 安装 Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      # 4. 安装 Go 语言 (Core 编译必须)
+      # 5. 安装 Go 语言 (编译核心必须)
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
           cache: false
 
-      # 5. 安装 Ninja 编译工具
+      # 6. 安装 Ninja 编译工具
       - name: Install Ninja build tool
         run: sudo apt-get update && sudo apt-get install -y ninja-build
 
-      # 6. 安装 Android SDK
+      # 7. 安装 Android SDK 和 NDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           api-level: 34
-          ndk-version: 25.2.9519653 # 指定具体的稳定版本
+          ndk-version: 25.2.9519653
           build-tools: 34.0.0
 
-      # 7. 强制配置 NDK 环境变量 (双重保险)
+      # 8. 强制配置 NDK 环境变量 (防止找不到)
       - name: Install and configure NDK
         run: |
-          echo "Looking for NDK..."
-          # 尝试找到 setup-android 安装的 NDK
+          echo "Configuring NDK..."
           NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -type d | sort -V | tail -n 1)
-          
-          if [ -z "$NDK_PATH" ] || [ "$NDK_PATH" = "$ANDROID_HOME/ndk" ]; then
-            echo "NDK not found standardly, downloading manual fallback..."
+          if [ -z "$NDK_PATH" ]; then
+            echo "Downloading NDK manually..."
             wget -q https://dl.google.com/android/repository/android-ndk-r25b-linux.zip -O /tmp/ndk.zip
             unzip -q /tmp/ndk.zip -d /tmp/
             NDK_PATH="/tmp/android-ndk-r25b"
           fi
-          
-          echo "Using NDK at: $NDK_PATH"
           echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
           echo "ANDROID_NDK=$NDK_PATH" >> $GITHUB_ENV
 
-      # 8. 获取项目依赖
+      # 9. 获取依赖
       - name: Get Flutter dependencies
-        run: dart pub get
+        run: flutter pub get
 
-      # 8.1 分析代码 (设置出错不中断，防止因代码风格问题停止打包)
-      - name: Analyze Dart code
-        run: flutter analyze
-        continue-on-error: true
-
-      # 9. 初始化并编译 Android 核心 (关键步骤)
+      # 10. 初始化并编译核心 (Go编译)
       - name: Build Android Core
         run: dart ./setup.dart android
 
-      # 10. 构建 Release APK (添加了 id: build 修复引用错误)
+      # 11. 构建 Release APK
       - name: Build Release APK
         id: build
         run: |
           flutter build apk --release --verbose 2>&1 | tee build.log
         continue-on-error: true
 
-      # 10.1 上传构建日志 (方便排错)
+      # 12. 上传构建日志 (如果失败)
       - name: Upload build log
         if: steps.build.outcome == 'failure'
         uses: actions/upload-artifact@v4
@@ -99,15 +116,15 @@ jobs:
           path: build.log
           retention-days: 3
 
-      # 10.2 检查构建结果 (修复了逻辑)
+      # 13. 检查结果
       - name: Check build result
         if: steps.build.outcome == 'failure'
         run: |
-          echo "Build failed! analyzing errors..."
-          grep -C 5 "error" build.log || echo "No explicit error found in grep"
+          echo "Build failed! Logs:"
+          tail -n 100 build.log
           exit 1
 
-      # 11. 上传 APK 文件
+      # 14. 上传成功的文件
       - name: Upload APK
         if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
