@@ -55,11 +55,31 @@ jobs:
           ndk-version: 25b
           build-tools: 34.0.0
 
-      # 5.1 设置 NDK 环境变量
+      # 5.1 查找 NDK 实际路径并设置环境变量
+      - name: Find and set NDK path
+        id: ndk
+        run: |
+          echo "Searching for NDK installation..."
+          # 查找 NDK 目录
+          NDK_PATH=$(find $ANDROID_HOME -type d -name "25b" 2>/dev/null | head -n 1)
+          echo "Found NDK at: $NDK_PATH"
+          if [ -z "$NDK_PATH" ]; then
+            echo "NDK not found, installing manually..."
+            # 手动下载并解压 NDK
+            wget -q https://dl.google.com/android/repository/android-ndk-r25b-linux.zip -O /tmp/ndk.zip
+            unzip -q /tmp/ndk.zip -d /tmp/
+            NDK_PATH="/tmp/android-ndk-r25b"
+          fi
+          echo "NDK_PATH=$NDK_PATH" >> $GITHUB_OUTPUT
+          echo "Final NDK path: $NDK_PATH"
+          ls -la "$NDK_PATH/toolchains/llvm/prebuilt/" || echo "Prebuilt dir not found"
+          
+      # 5.2 设置 NDK 环境变量
       - name: Set NDK environment variables
         run: |
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25b" >> $GITHUB_ENV
-          echo "ANDROID_NDK=$ANDROID_HOME/ndk/25b" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=${{ steps.ndk.outputs.NDK_PATH }}" >> $GITHUB_ENV
+          echo "ANDROID_NDK=${{ steps.ndk.outputs.NDK_PATH }}" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=${{ steps.ndk.outputs.NDK_PATH }}" >> $GITHUB_ENV
 
       # 6. 获取 Flutter 依赖
       - name: Get Flutter dependencies
