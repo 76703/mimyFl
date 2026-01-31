@@ -85,15 +85,18 @@ jobs:
       - name: Get Flutter dependencies
         run: flutter pub get
 
-      # 7. 获取 Go 依赖并编译 Android 核心
+      # 7. 安装 flutter_distributor 依赖
+      - name: Install flutter_distributor dependencies
+        run: |
+          cd plugins/flutter_distributor/packages/flutter_distributor
+          flutter pub get
+          dart pub global activate -s path .
+
+      # 8. 获取 Go 依赖并编译 Android 核心
       - name: Build Android Core (Go + CGO)
         run: dart ./setup.dart android --out app
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_PATH }}
-
-      # 8. 构建 Release APK
-      - name: Build Release APK
-        run: flutter build apk --release --verbose
 
       # 9. 上传 APK 文件
       - name: Upload APK
