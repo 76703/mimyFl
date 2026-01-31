@@ -81,24 +81,42 @@ jobs:
           echo "ANDROID_NDK=${{ steps.ndk.outputs.NDK_PATH }}" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=${{ steps.ndk.outputs.NDK_PATH }}" >> $GITHUB_ENV
 
-      # 6. 获取 Flutter 依赖
-      - name: Get Flutter dependencies
-        run: flutter pub get
-
       # 7. 安装 flutter_distributor 依赖
       - name: Install flutter_distributor dependencies
         run: |
+          echo "Installing flutter_distributor dependencies..."
           cd plugins/flutter_distributor/packages/flutter_distributor
-          flutter pub get
-          dart pub global activate -s path .
+          flutter pub get --verbose
+          dart pub global activate -s path . --verbose
+          echo "flutter_distributor installed successfully"
 
-      # 8. 获取 Go 依赖并编译 Android 核心
+      # 8. 清理并获取主项目依赖
+      - name: Clean and get main project dependencies
+        run: |
+          flutter clean
+          flutter pub get
+
+      # 9. 获取 Go 依赖并编译 Android 核心
       - name: Build Android Core (Go + CGO)
-        run: dart ./setup.dart android --out app
+        run: |
+          echo "Starting Android core build..."
+          dart ./setup.dart android --out app
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_PATH }}
 
-      # 9. 上传 APK 文件
+      # 10. 构建 Release APK（使用 flutter_distributor 或备选方案）
+      - name: Build Release APK
+        id: build
+        run: |
+          echo "Attempting build with flutter_distributor..."
+          cd plugins/flutter_distributor/packages/flutter_distributor
+          flutter_distributor package --skip-clean --platform android --targets apk --flutter-build-args="verbose,split-per-abi" --build-target-platform="android-arm,android-arm64,android-x64" --build-dart-define=APP_ENV=pre || {
+            echo "flutter_distributor failed, trying standard flutter build..."
+            cd $GITHUB_WORKSPACE
+            flutter build apk --release --verbose
+          }
+
+      # 11. 上传 APK 文件
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
