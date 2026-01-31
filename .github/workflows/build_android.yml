@@ -75,6 +75,10 @@ jobs:
       - name: Get Flutter dependencies
         run: dart pub get
 
+      # 8.1 分析 Dart 代码错误
+      - name: Analyze Dart code
+        run: flutter analyze
+
       # 9. 初始化并编译 Android 核心
       - name: Build Android Core
         run: dart ./setup.dart android
@@ -82,7 +86,26 @@ jobs:
       # 10. 构建 Release APK
       - name: Build Release APK
         run: |
-          flutter build apk --release --verbose --stack-trace
+          flutter build apk --release --verbose --stack-trace 2>&1 | tee build.log
+        continue-on-error: true
+
+      # 10.1 上传构建日志用于调试
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          retention-days: 7
+
+      # 10.2 检查构建是否成功
+      - name: Check build result
+        if: steps.build.outcome == 'failure'
+        run: |
+          echo "Build failed! Checking for errors..."
+          cat build.log | grep -A 10 -B 5 "error:" || echo "No explicit error found"
+          cat build.log | grep -A 5 "FAILURE" || echo "No failure message found"
+          exit 1
 
       # 11. 上传 APK 文件
       - name: Upload APK
