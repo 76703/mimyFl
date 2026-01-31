@@ -51,11 +51,20 @@ jobs:
           ndk-version: 25b
           build-tools: 34.0.0
 
-      # 7. 配置 NDK 环境变量
-      - name: Configure NDK environment
+      # 7. 安装并配置 NDK
+      - name: Install and configure NDK
         run: |
-          # 查找实际的 NDK 路径
+          # 检查 NDK 是否已存在
           NDK_PATH=$(find $ANDROID_HOME -type d -name "25b" | head -n 1)
+          
+          if [ -z "$NDK_PATH" ]; then
+            echo "NDK not found, downloading manually..."
+            # 下载 NDK
+            wget -q https://dl.google.com/android/repository/android-ndk-r25b-linux.zip -O /tmp/ndk.zip
+            unzip -q /tmp/ndk.zip -d /tmp/
+            NDK_PATH="/tmp/android-ndk-r25b"
+          fi
+          
           echo "Found NDK at: $NDK_PATH"
           echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
           echo "ANDROID_NDK=$NDK_PATH" >> $GITHUB_ENV
