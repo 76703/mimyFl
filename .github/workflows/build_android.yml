@@ -1,4 +1,4 @@
-name: Build Android APK (Auto-Fix)
+name: Build Android APK (Final Fix)
 
 on:
   push:
@@ -19,31 +19,46 @@ jobs:
           fetch-depth: 0
 
       # 2. 【核心修复步骤】强制修复缺失的插件和核心
-      # 如果您的 plugins 文件夹坏了，这一步会自动去官方仓库把好的插件搬过来
-      - name: Fix Missing Plugins & Core (Magic Fix)
+      # 这次加上了 --recursive，确保拉下来的 core 不是空壳！
+      - name: Fix Missing Plugins & Core (Deep Repair)
         run: |
-          echo "Checking plugins status..."
-          # 检查关键插件是否存在，如果不存在则强行从官方克隆
-          if [ ! -d "plugins/launch_at_startup" ] || [ -z "$(ls -A plugins/launch_at_startup)" ]; then
-            echo "⚠️ Plugins are missing or empty! Restoring from official repository..."
+          echo "🔍 Checking integrity..."
+          
+          # 定义一个函数来克隆官方资源
+          repair_from_official() {
+            echo "🚑 Detected missing files. Cloning official repository (recursively)..."
+            # 注意：这里加了 --recursive，这是解决上次报错的关键
+            git clone --recursive --depth 1 https://github.com/chen08209/FlClash.git temp_official_repo
             
-            # 克隆官方仓库到临时目录
-            git clone --depth 1 https://github.com/chen08209/FlClash.git temp_official_repo
-            
-            # 暴力替换 plugins 文件夹
+            echo "📦 Restoring 'plugins' folder..."
             rm -rf plugins
-            mv temp_official_repo/plugins .
+            cp -r temp_official_repo/plugins .
             
-            # 同时也修复核心代码 (core)
+            echo "📦 Restoring 'core' folder..."
             rm -rf core
-            mv temp_official_repo/core .
+            cp -r temp_official_repo/core .
             
-            # 清理临时文件
+            echo "🧹 Cleaning up temp files..."
             rm -rf temp_official_repo
-            
-            echo "✅ Plugins and Core restored successfully!"
+          }
+
+          # 检查 core/Clash.Meta 是否存在且不为空
+          if [ ! -d "core/Clash.Meta" ] || [ -z "$(ls -A core/Clash.Meta)" ]; then
+            repair_from_official
+          elif [ ! -d "plugins/launch_at_startup" ]; then
+            repair_from_official
           else
-            echo "Plugins look fine."
+            echo "✅ Files seem intact."
+          fi
+          
+          # 验证一下 core 里面到底有没有东西 (Debug)
+          echo "📂 Verifying core structure:"
+          ls -F core/
+          if [ -d "core/Clash.Meta" ]; then
+             echo "✅ core/Clash.Meta exists."
+             ls -F core/Clash.Meta/go.mod || echo "❌ go.mod missing!"
+          else
+             echo "❌ core/Clash.Meta is still missing!"
           fi
 
       # 3. 安装 Java JDK 17
@@ -78,7 +93,7 @@ jobs:
           ndk-version: 25.2.9519653
           build-tools: 34.0.0
 
-      # 8. 强制配置 NDK 环境变量 (防止找不到)
+      # 8. 强制配置 NDK 环境变量
       - name: Install and configure NDK
         run: |
           echo "Configuring NDK..."
@@ -97,6 +112,7 @@ jobs:
         run: flutter pub get
 
       # 10. 初始化并编译核心 (Go编译)
+      # 这次 core 文件夹里有东西了，这一步就不会报错了
       - name: Build Android Core
         run: dart ./setup.dart android
 
