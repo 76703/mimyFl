@@ -30,7 +30,6 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 'stable'
           channel: 'stable'
 
       # 4. 安装 Go 语言
